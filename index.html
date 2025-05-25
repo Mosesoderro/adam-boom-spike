@@ -78,13 +78,13 @@
     let countdownTimer;
 
     function connect() {
-      const symbol = 'boom_1000_index';
+      const symbol = 'R_1000'; // Boom 1000
       const granularity = 3600; // 1 hour
-      const appId = 1089;
 
-      ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${appId}`);
+      ws = new WebSocket('wss://ws.deriv.com/websockets/v3');
 
       ws.onopen = () => {
+        ws.send(JSON.stringify({ active_symbols: "brief", product_type: "basic" }));
         ws.send(JSON.stringify({
           ticks_history: symbol,
           style: 'candles',
