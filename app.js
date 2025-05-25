@@ -1,61 +1,46 @@
-const marketSelect = document.getElementById('market');
-const granularitySelect = document.getElementById('granularity');
+const chartEl = document.querySelector('#chart');
+const signalEl = document.getElementById('signal');
+const siren = document.getElementById('siren');
 let chart;
 let ws;
 
-function getSymbolFromValue(value) {
-  if (value === 'R_50') return 'boom_500_index';
-  if (value === 'R_100') return 'boom_1000_index';
-  return 'boom_500_index';
-}
+function connect() {
+  const symbol = 'boom_1000_index';
+  const granularity = 3600; // 1 hour
+  const appId = 1089;
 
-function connectToDeriv(symbol, granularity) {
-  if (ws) ws.close();
-
-  ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
+  ws = new WebSocket(`wss://ws.binaryws.com/websockets/v3?app_id=${appId}`);
 
   ws.onopen = () => {
-    const candleRequest = {
+    ws.send(JSON.stringify({
       candles: symbol,
-      granularity: parseInt(granularity),
-      count: 100,
+      granularity,
+      count: 50,
       subscribe: 1
-    };
-    ws.send(JSON.stringify(candleRequest));
+    }));
   };
 
-  ws.onmessage = (event) => {
-    const response = JSON.parse(event.data);
-    const candles = response.candles || response.history?.candles || [];
+  ws.onmessage = (msg) => {
+    const data = JSON.parse(msg.data);
+    const candles = data.candles || data.history?.candles || [];
 
     if (candles.length) {
       const seriesData = candles.map(c => ({
         x: new Date(c.epoch * 1000),
-        y: [
-          parseFloat(c.open),
-          parseFloat(c.high),
-          parseFloat(c.low),
-          parseFloat(c.close)
-        ]
+        y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
       }));
       updateChart(seriesData);
+      detectSpike(seriesData);
     }
   };
 
-  ws.onerror = (err) => {
-    console.error("WebSocket Error:", err);
-    document.getElementById("signal").textContent = "⚠️ Connection Error";
-  };
-
-  ws.onclose = () => {
-    console.warn("WebSocket Closed");
-    document.getElementById("signal").textContent = "🔌 Disconnected";
-  };
+  ws.onerror = (e) => console.error('WebSocket error:', e);
+  ws.onclose = () => console.log('WebSocket closed.');
 }
 
 function updateChart(data) {
   if (!chart) {
-    chart = new ApexCharts(document.querySelector('#chart'), {
+    chart = new ApexCharts(chartEl, {
       chart: {
         type: 'candlestick',
         height: 500,
@@ -63,9 +48,7 @@ function updateChart(data) {
         foreColor: '#0f0'
       },
       series: [{ data }],
-      xaxis: {
-        type: 'datetime'
-      },
+      xaxis: { type: 'datetime' },
       plotOptions: {
         candlestick: {
           colors: {
@@ -81,13 +64,18 @@ function updateChart(data) {
   }
 }
 
-function update() {
-  const market = getSymbolFromValue(marketSelect.value);
-  const granularity = granularitySelect.value;
-  connectToDeriv(market, granularity);
+function detectSpike(data) {
+  if (data.length < 2) return;
+  const last = data[data.length - 1];
+  const prev = data[data.length - 2];
+
+  const isSpike = last.y[1] - last.y[0] > (prev.y[1] - prev.y[0]) * 1.5;
+  if (isSpike) {
+    signalEl.textContent = '🚨 Spike detected!';
+    siren.play();
+  } else {
+    signalEl.textContent = 'Monitoring for spikes...';
+  }
 }
 
-marketSelect.addEventListener('change', update);
-granularitySelect.addEventListener('change', update);
-
-update(); // initial load
+connect();
