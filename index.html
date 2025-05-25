@@ -42,8 +42,8 @@
       <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
       <label for="market">Market:</label>
       <select id="market">
-        <option value="BOOM500">Boom 500</option>
-        <option value="BOOM1000">Boom 1000</option>
+        <option value="R_50">Boom 500</option>
+        <option value="R_100">Boom 1000</option>
       </select>
       <label for="granularity">Timeframe:</label>
       <select id="granularity">
@@ -72,15 +72,17 @@
     const granularitySelect = document.getElementById("granularity");
     let chart;
     let ws;
+    let candleData = [];
 
     function connectToDeriv(symbol, granularity) {
       if (ws) ws.close();
 
       ws = new WebSocket("wss://ws.deriv.com/websockets/v3");
+      
       ws.onopen = () => {
+        // Request historical + live candle data
         ws.send(JSON.stringify({
-          ticks_history: symbol,
-          style: "candles",
+          candles: symbol,
           granularity: parseInt(granularity),
           count: 100,
           subscribe: 1
@@ -89,18 +91,34 @@
 
       ws.onmessage = (msg) => {
         const data = JSON.parse(msg.data);
+
+        // Load historical candles
         if (data.candles) {
-          const candles = data.candles.map(c => ({
+          candleData = data.candles.map(c => ({
             x: new Date(c.epoch * 1000),
             y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
           }));
-          updateChart(candles);
+          updateChart(candleData);
+        }
+
+        // Handle live updates
+        if (data.candle) {
+          const c = data.candle;
+          const newCandle = {
+            x: new Date(c.epoch * 1000),
+            y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
+          };
+          candleData.push(newCandle);
+          if (candleData.length > 100) candleData.shift(); // Keep last 100
+          chart.updateSeries([{ data: candleData }]);
         }
       };
 
       ws.onerror = (e) => {
+        document.getElementById("signal").textContent = "Connection error!";
         console.error("WebSocket error:", e);
       };
+
       ws.onclose = () => {
         console.log("WebSocket closed. Reconnecting...");
         setTimeout(() => connectToDeriv(symbol, granularity), 3000);
@@ -123,8 +141,8 @@
           plotOptions: {
             candlestick: {
               colors: {
-                upward: '#00f',   // blue for bullish
-                downward: '#f00'  // red for bearish
+                upward: '#00f', // blue for bullish
+                downward: '#f00' // red for bearish
               }
             }
           }
@@ -144,7 +162,7 @@
     marketSelect.addEventListener("change", update);
     granularitySelect.addEventListener("change", update);
 
-    update(); // Initial call
+    update(); // Initial chart load
   </script>
 </body>
 </html>
