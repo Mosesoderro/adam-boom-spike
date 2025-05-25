@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>ADAM BOOM SPIKE</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.min.css">
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <style>
     body {
@@ -11,6 +11,7 @@
       background: #111;
       color: #0f0;
       margin: 0;
+      padding: 0;
       text-align: center;
     }
     header, footer {
@@ -32,8 +33,7 @@
     #signal {
       margin-top: 20px;
       font-weight: bold;
-      font-size: 1.4em;
-      color: #0f0;
+      font-size: 1.2em;
     }
   </style>
 </head>
@@ -44,8 +44,9 @@
       <label for="market">Market:</label>
       <select id="market">
         <option value="BOOM500">Boom 500</option>
-        <option value="BOOM1000" selected>Boom 1000</option>
+        <option value="BOOM1000">Boom 1000</option>
       </select>
+
       <label for="granularity">Timeframe:</label>
       <select id="granularity">
         <option value="60">1 min</option>
@@ -69,74 +70,19 @@
   </div>
 
   <script>
-    const marketSelect = document.getElementById("market");
-    const granularitySelect = document.getElementById("granularity");
+    const marketSelect = document.getElementById('market');
+    const granularitySelect = document.getElementById('granularity');
     let chart;
     let ws;
-    let candleData = [];
 
-    function connectToDeriv(symbol, granularity) {
-      if (ws) ws.close();
-
-      ws = new WebSocket("wss://ws.deriv.com/websockets/v3");
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
-          ticks_history: symbol,
-          style: "candles",
-          granularity: parseInt(granularity),
-          count: 100,
-          subscribe: 1
-        }));
-      };
-
-      ws.onmessage = (msg) => {
-        const data = JSON.parse(msg.data);
-        if (data.candles) {
-          candleData = data.candles.map(c => ({
-            x: new Date(c.epoch * 1000),
-            y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
-          }));
-          updateChart(candleData);
-        } else if (data.candle) {
-          const c = data.candle;
-          const newCandle = {
-            x: new Date(c.epoch * 1000),
-            y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
-          };
-          candleData.push(newCandle);
-          if (candleData.length > 100) candleData.shift();
-
-          // Spike Prediction Logic
-          const recent = candleData.slice(-6);
-          const bodySizes = recent.slice(0, 5).map(c => c.y[1] - c.y[2]);
-          const avgSize = bodySizes.reduce((a, b) => a + b, 0) / bodySizes.length;
-          const currentSize = newCandle.y[1] - newCandle.y[2];
-
-          const signalEl = document.getElementById("signal");
-          if (currentSize > avgSize * 2) {
-            signalEl.textContent = "⚠ Spike Incoming!";
-            signalEl.style.color = "yellow";
-          } else {
-            signalEl.textContent = "Monitoring for spikes...";
-            signalEl.style.color = "#0f0";
-          }
-
-          chart.updateSeries([{ data: candleData }]);
-        }
-      };
-
-      ws.onerror = (e) => {
-        console.error("WebSocket error:", e);
-      };
-      ws.onclose = () => {
-        console.log("WebSocket closed. Reconnecting...");
-        setTimeout(() => connectToDeriv(symbol, granularity), 3000);
-      };
-    }
+    const SYMBOLS = {
+      BOOM500: 'boom_500_index',
+      BOOM1000: 'boom_1000_index'
+    };
 
     function updateChart(data) {
       if (!chart) {
-        chart = new ApexCharts(document.querySelector("#chart"), {
+        chart = new ApexCharts(document.querySelector('#chart'), {
           chart: {
             type: 'candlestick',
             height: 500,
@@ -162,16 +108,46 @@
       }
     }
 
+    function connectToDeriv(symbol, granularity) {
+      if (ws) ws.close();
+
+      ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          candles: symbol,
+          granularity: parseInt(granularity),
+          count: 50,
+          subscribe: 1
+        }));
+      };
+
+      ws.onmessage = (msg) => {
+        const data = JSON.parse(msg.data);
+        if (data.candles) {
+          const seriesData = data.candles.map(c => ({
+            x: new Date(c.epoch * 1000),
+            y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
+          }));
+          updateChart(seriesData);
+        }
+      };
+
+      ws.onerror = (e) => console.error('WebSocket error:', e);
+      ws.onclose = () => console.log('WebSocket closed.');
+    }
+
     function update() {
       const market = marketSelect.value;
       const granularity = granularitySelect.value;
-      connectToDeriv(market, granularity);
+      const symbol = SYMBOLS[market];
+      connectToDeriv(symbol, granularity);
     }
 
-    marketSelect.addEventListener("change", update);
-    granularitySelect.addEventListener("change", update);
+    marketSelect.addEventListener('change', update);
+    granularitySelect.addEventListener('change', update);
 
-    update(); // initial call
+    update();
   </script>
 </body>
 </html>
