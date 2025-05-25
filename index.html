@@ -1,65 +1,151 @@
-
-        }));
-      };
-
-      ws.onmessage = (msg) => {
-        const data = JSON.parse(msg.data);
-        if (data.candles) {
-          const seriesData = data.candles.map(c => ({
-            x: new Date(c.epoch * 1000),
-            y: [
-              parseFloat(c.open),
-              parseFloat(c.high),
-              parseFloat(c.low),
-              parseFloat(c.close)
-            ]
-          }));
-          updateChart(seriesData);
-        }
-      };
-
-      ws.onerror = (e) => console.error('WebSocket error:', e);
-      ws.onclose = () => console.log('WebSocket closed.');
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ADAM BOOM SPIKE</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://s3.tradingview.com/tv.js"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #111;
+      color: #0f0;
+      margin: 0;
+      padding: 0;
+      text-align: center;
     }
+    header, footer {
+      padding: 1em;
+      background: #222;
+    }
+    main {
+      padding: 1em;
+    }
+    #login {
+      margin-top: 100px;
+    }
+    input {
+      padding: 8px;
+      margin: 5px;
+      font-size: 1em;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 1em;
+      background: #0f0;
+      color: #000;
+      border: none;
+      cursor: pointer;
+    }
+    select {
+      padding: 6px;
+      font-size: 1em;
+      margin: 0 5px;
+    }
+    #signal {
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+  </style>
+</head>
+<body>
+  <div id="login">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button id="loginBtn">Login</button>
+    <p id="login-error"></p>
+  </div>
 
-    function updateChart(data) {
-      if (!chart) {
-        chart = new ApexCharts(document.querySelector('#chart'), {
-          chart: {
-            type: 'candlestick',
-            height: 500,
-            background: '#111',
-            foreColor: '#0f0'
-          },
-          series: [{ data }],
-          xaxis: {
-            type: 'datetime'
-          },
-          plotOptions: {
-            candlestick: {
-              colors: {
-                upward: '#00f',
-                downward: '#f00'
-              }
-            }
-          }
-        });
-        chart.render();
+  <div id="app" style="display: none;">
+    <header>
+      <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
+      <label for="market">Market:</label>
+      <select id="market">
+        <option value="BOOM500">Boom 500</option>
+        <option value="BOOM1000">Boom 1000</option>
+      </select>
+
+      <label for="granularity">Timeframe:</label>
+      <select id="granularity">
+        <option value="1">1 min</option>
+        <option value="5">5 min</option>
+        <option value="15">15 min</option>
+        <option value="60">1 hour</option>
+        <option value="240">4 hour</option>
+        <option value="1D">1 Day</option>
+      </select>
+    </header>
+
+    <main>
+      <div id="chart-container" style="height: 500px;"></div>
+      <div id="signal">Monitoring for spikes...</div>
+    </main>
+
+    <footer>
+      <p>© 2025 Sheriff Adam 💰</p>
+    </footer>
+  </div>
+
+  <script>
+    const loginBtn = document.getElementById('loginBtn');
+    const loginBox = document.getElementById('login');
+    const appBox = document.getElementById('app');
+    const loginError = document.getElementById('login-error');
+
+    loginBtn.onclick = function login() {
+      const user = document.getElementById('username').value;
+      const pass = document.getElementById('password').value;
+      if (user === 'admin' && pass === 'spike2025') {
+        loginBox.style.display = 'none';
+        appBox.style.display = 'block';
+        updateChart();
       } else {
-        chart.updateSeries([{ data }]);
+        loginError.innerText = 'Invalid login. Try admin / spike2025';
       }
+    };
+
+    let currentWidget;
+
+    function renderTradingViewChart(symbol, interval) {
+      if (currentWidget) currentWidget.remove();
+
+      currentWidget = new TradingView.widget({
+        container_id: "chart-container",
+        width: "100%",
+        height: 500,
+        symbol: "DERIV:" + symbol,
+        interval: interval,
+        timezone: "Etc/UTC",
+        theme: "dark",
+        style: "1",
+        locale: "en",
+        toolbar_bg: "#111",
+        enable_publishing: false,
+        allow_symbol_change: false,
+        hide_top_toolbar: false,
+        hide_legend: false,
+        studies: [
+          "MACD@tv-basicstudies",
+          "RSI@tv-basicstudies",
+          "StochasticRSI@tv-basicstudies"
+        ]
+      });
     }
 
-    function update() {
-      const market = marketSelect.value;
-      const granularity = granularitySelect.value;
-      connectToDeriv(market, granularity);
+    const marketSelect = document.getElementById('market');
+    const granularitySelect = document.getElementById('granularity');
+
+    function updateChart() {
+      const symbol = marketSelect.value;
+      const interval = granularitySelect.value;
+      renderTradingViewChart(symbol, interval);
     }
 
-    marketSelect.addEventListener('change', update);
-    granularitySelect.addEventListener('change', update);
-
-    update();
+    marketSelect.addEventListener('change', updateChart);
+    granularitySelect.addEventListener('change', updateChart);
   </script>
 </body>
 </html>
