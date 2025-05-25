@@ -73,46 +73,16 @@
     const countdownEl = document.getElementById('countdown');
     const siren = document.getElementById('siren');
     let chart;
-    let ws;
     let countdownTimer;
     let lastSpikeTime = null;
 
-    function connect() {
-      const symbol = 'R_1000'; // Boom 1000
-      const granularity = 3600; // 1 hour
-
-      ws = new WebSocket('wss://ws.deriv.com/websockets/v3');
-
-      ws.onopen = () => {
-        ws.send(JSON.stringify({
-          ticks_history: symbol,
-          style: 'candles',
-          adjust_start_time: 1,
-          count: 100,
-          granularity,
-          subscribe: 1
-        }));
-      };
-
-      ws.onmessage = (msg) => {
-        const data = JSON.parse(msg.data);
-        const candles = data.candles || data.history?.candles || [];
-
-        if (candles.length) {
-          const seriesData = candles.map(c => ({
-            x: new Date(c.epoch * 1000),
-            y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
-          }));
-          updateChart(seriesData);
-          detectSpike(seriesData);
-        }
-      };
-
-      ws.onerror = (e) => console.error('WebSocket error:', e);
-      ws.onclose = () => {
-        console.warn('WebSocket closed. Retrying in 3s...');
-        setTimeout(connect, 3000);
-      };
+    async function fetchCandles() {
+      const response = await fetch('https://api.deriv.com/api/ticks/history/R_1000?style=candles&granularity=3600&count=100');
+      const data = await response.json();
+      return (data.candles || []).map(c => ({
+        x: new Date(c.epoch * 1000),
+        y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
+      }));
     }
 
     function updateChart(data) {
@@ -145,9 +115,6 @@
       if (data.length < 4) return;
 
       const last = data[data.length - 1];
-      const prev = data[data.length - 2];
-      const prev2 = data[data.length - 3];
-
       const bodySize = Math.abs(last.y[3] - last.y[0]);
       const wickSize = last.y[1] - last.y[2];
       const isSpike = wickSize > bodySize * 3 && last.y[3] < last.y[0];
@@ -182,7 +149,18 @@
       }, 1000);
     }
 
-    connect();
+    async function init() {
+      const data = await fetchCandles();
+      updateChart(data);
+      detectSpike(data);
+      setInterval(async () => {
+        const newData = await fetchCandles();
+        updateChart(newData);
+        detectSpike(newData);
+      }, 60000);
+    }
+
+    init();
   </script>
 </body>
 </html>
