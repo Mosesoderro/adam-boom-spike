@@ -1,166 +1,100 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>ADAM BOOM SPIKE</title>
-  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Adam Boom Spike Detector</title>
   <style>
     body {
-      font-family: 'Segoe UI', sans-serif;
-      background: #111;
+      background-color: #111;
       color: #0f0;
-      margin: 0;
-      padding: 0;
+      font-family: 'Arial', sans-serif;
       text-align: center;
+      padding: 20px;
     }
-    header, footer {
-      padding: 1em;
-      background: #222;
+    .header {
+      font-size: 24px;
+      margin-bottom: 10px;
     }
-    main {
-      padding: 1em;
-    }
-    #chart-container {
-      max-width: 100%;
-      margin: auto;
-    }
-    #signal {
+    .log-table {
       margin-top: 20px;
+      width: 100%;
+      color: white;
+    }
+    table, th, td {
+      border: 1px solid #555;
+      border-collapse: collapse;
+      padding: 5px;
+    }
+    .alert {
+      color: red;
       font-weight: bold;
-      font-size: 1.2em;
+      animation: blink 1s infinite;
     }
-    #spike-time {
-      margin-top: 10px;
-      font-size: 1em;
-      color: #ff0;
-    }
-    #countdown {
-      font-size: 1.2em;
-      color: #f80;
-      margin-top: 10px;
-    }
-    audio {
-      display: none;
+    @keyframes blink {
+      0%, 100% { color: red; }
+      50% { color: yellow; }
     }
   </style>
 </head>
 <body>
-  <div id="app">
-    <header>
-      <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
-      <p>Market: Boom 1000 | Timeframe: 1 Hour</p>
-    </header>
 
-    <main>
-      <div id="chart-container">
-        <div id="chart" style="height: 500px;"></div>
-      </div>
-      <div id="signal">Monitoring for spikes...</div>
-      <div id="spike-time"></div>
-      <div id="countdown"></div>
-      <audio id="siren" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
-    </main>
+  <div class="header">🚨 ADAM BOOM SPIKE DETECTOR 🚨</div>
+  <div>Market: Boom 1000 | Timeframe: 1 Hour</div>
 
-    <footer>
-      <p>© 2025 Sheriff Adam 💰</p>
-    </footer>
-  </div>
+  <p id="status">Monitoring for spikes...</p>
+  <audio id="alertSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+
+  <table class="log-table">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Price</th>
+        <th>Spike Size</th>
+      </tr>
+    </thead>
+    <tbody id="spikeLog"></tbody>
+  </table>
+
+  <footer style="margin-top: 50px;">
+    © 2025 Sheriff Adam
+  </footer>
 
   <script>
-    const chartEl = document.querySelector('#chart');
-    const signalEl = document.getElementById('signal');
-    const timeEl = document.getElementById('spike-time');
-    const countdownEl = document.getElementById('countdown');
-    const siren = document.getElementById('siren');
-    let chart;
-    let countdownTimer;
-    let lastSpikeTime = null;
+    const status = document.getElementById('status');
+    const spikeLog = document.getElementById('spikeLog');
+    const alertSound = document.getElementById('alertSound');
 
-    async function fetchCandles() {
-      const response = await fetch('https://api.deriv.com/api/ticks/history/R_1000?style=candles&granularity=3600&count=100');
-      const data = await response.json();
-      return (data.candles || []).map(c => ({
-        x: new Date(c.epoch * 1000),
-        y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
-      }));
+    let lastPrice = 10000;
+
+    function simulatePriceFeed() {
+      const newPrice = lastPrice + (Math.random() * 30 - 15);
+      detectSpike(newPrice);
+      lastPrice = newPrice;
     }
 
-    function updateChart(data) {
-      if (!chart) {
-        chart = new ApexCharts(chartEl, {
-          chart: {
-            type: 'candlestick',
-            height: 500,
-            background: '#111',
-            foreColor: '#0f0'
-          },
-          series: [{ data }],
-          xaxis: { type: 'datetime' },
-          plotOptions: {
-            candlestick: {
-              colors: {
-                upward: '#00f',
-                downward: '#f00'
-              }
-            }
-          }
-        });
-        chart.render();
+    function detectSpike(currentPrice) {
+      const spikeSize = Math.abs(currentPrice - lastPrice);
+      if (spikeSize > 10) {
+        status.textContent = "SPIKE DETECTED!";
+        status.className = "alert";
+        alertSound.play();
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${new Date().toLocaleTimeString()}</td>
+          <td>${currentPrice.toFixed(2)}</td>
+          <td>${spikeSize.toFixed(2)}</td>
+        `;
+        spikeLog.prepend(row);
       } else {
-        chart.updateSeries([{ data }]);
+        status.textContent = "Monitoring for spikes...";
+        status.className = "";
       }
     }
 
-    function detectSpike(data) {
-      if (data.length < 4) return;
-
-      const last = data[data.length - 1];
-      const bodySize = Math.abs(last.y[3] - last.y[0]);
-      const wickSize = last.y[1] - last.y[2];
-      const isSpike = wickSize > bodySize * 3 && last.y[3] < last.y[0];
-
-      if (isSpike && lastSpikeTime !== last.x.getTime()) {
-        lastSpikeTime = last.x.getTime();
-        startCountdown(30, () => {
-          signalEl.textContent = '🚨 Spike Detected!';
-          timeEl.textContent = `Spike Time: ${last.x.toLocaleString()}`;
-          try { siren.play(); } catch (err) { console.warn("Audio failed to play"); }
-        });
-      } else {
-        signalEl.textContent = 'Monitoring for spikes...';
-        timeEl.textContent = '';
-        countdownEl.textContent = '';
-        clearInterval(countdownTimer);
-      }
-    }
-
-    function startCountdown(seconds, onComplete) {
-      clearInterval(countdownTimer);
-      let timeLeft = seconds;
-      countdownEl.textContent = `Spike in ${timeLeft} seconds...`;
-      countdownTimer = setInterval(() => {
-        timeLeft--;
-        countdownEl.textContent = `Spike in ${timeLeft} seconds...`;
-        if (timeLeft <= 0) {
-          clearInterval(countdownTimer);
-          countdownEl.textContent = '';
-          onComplete();
-        }
-      }, 1000);
-    }
-
-    async function init() {
-      const data = await fetchCandles();
-      updateChart(data);
-      detectSpike(data);
-      setInterval(async () => {
-        const newData = await fetchCandles();
-        updateChart(newData);
-        detectSpike(newData);
-      }, 60000);
-    }
-
-    init();
+    setInterval(simulatePriceFeed, 3000);
   </script>
+
 </body>
 </html>
