@@ -2,81 +2,93 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Adam Boom Spike</title>
+  <title>ADAM BOOM SPIKE</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.min.css">
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background-color: #111;
+      font-family: 'Segoe UI', sans-serif;
+      background: #111;
       color: #0f0;
       margin: 0;
       padding: 0;
       text-align: center;
     }
     header, footer {
-      background-color: #222;
       padding: 1em;
+      background: #222;
     }
     main {
       padding: 1em;
     }
     select {
-      font-size: 16px;
-      margin: 5px;
-      padding: 5px;
+      padding: 6px;
+      font-size: 1em;
+      margin: 0 5px;
     }
-    #chart {
+    #chart-container {
       max-width: 100%;
       margin: auto;
+    }
+    #signal {
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 1.2em;
     }
   </style>
 </head>
 <body>
+  <div id="app">
+    <header>
+      <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
+      <label for="market">Market:</label>
+      <select id="market">
+        <option value="R_50">Boom 500</option>
+        <option value="R_100">Boom 1000</option>
+      </select>
 
-  <header>
-    <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
-    <label for="market">Market:</label>
-    <select id="market">
-      <option value="boom_500_index">Boom 500</option>
-      <option value="boom_1000_index">Boom 1000</option>
-    </select>
+      <label for="granularity">Timeframe:</label>
+      <select id="granularity">
+        <option value="60">1 min</option>
+        <option value="300">5 min</option>
+        <option value="900">15 min</option>
+        <option value="3600">1 hour</option>
+        <option value="14400">4 hour</option>
+        <option value="86400">1 Day</option>
+      </select>
+    </header>
 
-    <label for="granularity">Timeframe:</label>
-    <select id="granularity">
-      <option value="60">1 Minute</option>
-      <option value="300">5 Minutes</option>
-      <option value="900">15 Minutes</option>
-      <option value="3600">1 Hour</option>
-    </select>
-  </header>
-
-  <main>
-    <div id="chart"></div>
-    <p id="status">Connecting to Deriv...</p>
-  </main>
-
-  <footer>
-    <p>© 2025 Sheriff Adam 💰</p>
-  </footer>
+    <main>
+      <div id="chart-container">
+        <div id="chart" style="height: 500px;"></div>
+      </div>
+      <div id="signal">Monitoring for spikes...</div>
+    </main>
+    <footer>
+      <p>© 2025 Sheriff Adam 💰</p>
+    </footer>
+  </div>
 
   <script>
+    const marketSelect = document.getElementById('market');
+    const granularitySelect = document.getElementById('granularity');
     let chart;
     let ws;
 
-    const marketSelect = document.getElementById('market');
-    const granularitySelect = document.getElementById('granularity');
-    const status = document.getElementById('status');
+    function getSymbolFromValue(value) {
+      if (value === 'R_50') return 'boom_500_index';
+      if (value === 'R_100') return 'boom_1000_index';
+      return 'boom_500_index';
+    }
 
-    function connect(symbol, granularity) {
+    async function connectToDeriv(symbol, granularity) {
       if (ws) ws.close();
 
       ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
 
       ws.onopen = () => {
-        status.textContent = "📡 Connected. Loading candles...";
         ws.send(JSON.stringify({
-          ticks_history: symbol,
-          style: 'candles',
+          candles: symbol,
           granularity: parseInt(granularity),
           count: 50,
           subscribe: 1
@@ -85,10 +97,10 @@
 
       ws.onmessage = (msg) => {
         const data = JSON.parse(msg.data);
-        const candles = data.candles || [];
+        const candles = data.candles || data.history?.candles || [];
 
         if (candles.length) {
-          const chartData = candles.map(c => ({
+          const seriesData = candles.map(c => ({
             x: new Date(c.epoch * 1000),
             y: [
               parseFloat(c.open),
@@ -97,25 +109,17 @@
               parseFloat(c.close)
             ]
           }));
-
-          updateChart(chartData);
-          status.textContent = "✅ Live data updated";
+          updateChart(seriesData);
         }
       };
 
-      ws.onerror = (e) => {
-        status.textContent = "❌ Error connecting to WebSocket";
-        console.error("WebSocket error", e);
-      };
-
-      ws.onclose = () => {
-        status.textContent = "🔌 WebSocket closed";
-      };
+      ws.onerror = (e) => console.error('WebSocket error:', e);
+      ws.onclose = () => console.log('WebSocket closed.');
     }
 
     function updateChart(data) {
       if (!chart) {
-        chart = new ApexCharts(document.querySelector("#chart"), {
+        chart = new ApexCharts(document.querySelector('#chart'), {
           chart: {
             type: 'candlestick',
             height: 500,
@@ -142,9 +146,9 @@
     }
 
     function update() {
-      const symbol = marketSelect.value;
+      const market = getSymbolFromValue(marketSelect.value);
       const granularity = granularitySelect.value;
-      connect(symbol, granularity);
+      connectToDeriv(market, granularity);
     }
 
     marketSelect.addEventListener('change', update);
@@ -152,6 +156,5 @@
 
     update();
   </script>
-
 </body>
 </html>
