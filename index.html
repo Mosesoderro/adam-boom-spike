@@ -1,4 +1,3 @@
-<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,25 +37,11 @@
       <div id="chart" style="height: 500px;"></div>
       <div id="signal">Monitoring for spikes...</div>
     </main>
+
     <footer>
       <p>© 2025 Sheriff Adam 💰</p>
     </footer>
   </div>
-
-  <script>
-    document.getElementById("loginBtn").addEventListener("click", function login() {
-      const username = document.getElementById("username").value;
-      const password = document.getElementById("password").value;
-      const errorMsg = document.getElementById("login-error");
-
-      if (username === "admin" && password === "admin123") {
-        document.getElementById("login").style.display = "none";
-        document.getElementById("app").style.display = "block";
-      } else {
-        errorMsg.textContent = "Invalid credentials. Try again.";
-      }
-    });
-  </script>
 
   <script src="app.js" defer></script>
 </body>
