@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,8 +11,10 @@
     <p>The New Sheriff in Town</p>
   </header>
   <main>
-    <div id="chart">[Live Chart Loading...]</div>
-    <div id="signal">No signal yet.</div>
+    <div id="chart-container">
+      <iframe id="deriv-chart" src="https://smarttrader.deriv.com/app/chart?symbol=R_500&interval=1m" width="100%" height="400" frameborder="0"></iframe>
+    </div>
+    <div id="signal">Monitoring for spikes...</div>
   </main>
   <footer>
     <p>© 2025 Sheriff Adam 💰</p>
