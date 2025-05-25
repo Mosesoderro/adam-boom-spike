@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>ADAM BOOM SPIKE</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.css">
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <style>
     body {
@@ -11,7 +11,6 @@
       background: #111;
       color: #0f0;
       margin: 0;
-      padding: 0;
       text-align: center;
     }
     header, footer {
@@ -43,8 +42,8 @@
       <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
       <label for="market">Market:</label>
       <select id="market">
-        <option value="R_50">Boom 500</option>
-        <option value="R_100">Boom 1000</option>
+        <option value="boom_500_index">Boom 500</option>
+        <option value="boom_1000_index">Boom 1000</option>
       </select>
 
       <label for="granularity">Timeframe:</label>
@@ -62,7 +61,7 @@
       <div id="chart-container">
         <div id="chart" style="height: 500px;"></div>
       </div>
-      <div id="signal">Monitoring for spikes...</div>
+      <div id="signal">📡 Connected. Loading candles...</div>
     </main>
     <footer>
       <p>© 2025 Sheriff Adam 💰</p>
@@ -70,51 +69,52 @@
   </div>
 
   <script>
-    const marketSelect = document.getElementById('market');
-    const granularitySelect = document.getElementById('granularity');
     let chart;
     let ws;
 
-    function getSymbolFromValue(value) {
-      if (value === 'R_50') return 'boom_500_index';
-      if (value === 'R_100') return 'boom_1000_index';
-      return 'boom_500_index';
-    }
+    const marketSelect = document.getElementById('market');
+    const granularitySelect = document.getElementById('granularity');
 
-    async function connectToDeriv(symbol, granularity) {
+    function createWebSocket(symbol, granularity) {
       if (ws) ws.close();
 
       ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
 
       ws.onopen = () => {
-        ws.send(JSON.stringify({
+        const req = {
           candles: symbol,
           granularity: parseInt(granularity),
           count: 50,
           subscribe: 1
-        }));
+        };
+        ws.send(JSON.stringify(req));
+        document.getElementById('signal').textContent = '📡 Connected. Loading candles...';
       };
 
       ws.onmessage = (msg) => {
         const data = JSON.parse(msg.data);
-        const candles = data.candles || data.history?.candles || [];
 
-        if (candles.length) {
-          const seriesData = candles.map(c => ({
+        if (data.msg_type === 'candles') {
+          const candles = data.candles.map(c => ({
             x: new Date(c.epoch * 1000),
-            y: [
-              parseFloat(c.open),
-              parseFloat(c.high),
-              parseFloat(c.low),
-              parseFloat(c.close)
-            ]
+            y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
           }));
-          updateChart(seriesData);
+          updateChart(candles);
+        }
+        if (data.msg_type === 'ohlc') {
+          const c = data.ohlc;
+          const newCandle = {
+            x: new Date(c.epoch * 1000),
+            y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
+          };
+          updateChartPoint(newCandle);
         }
       };
 
-      ws.onerror = (e) => console.error('WebSocket error:', e);
-      ws.onclose = () => console.log('WebSocket closed.');
+      ws.onerror = (e) => {
+        console.error('WebSocket error:', e);
+        document.getElementById('signal').textContent = '❌ WebSocket Error';
+      };
     }
 
     function updateChart(data) {
@@ -145,10 +145,17 @@
       }
     }
 
+    function updateChartPoint(candle) {
+      const currentSeries = chart.w.globals.initialSeries[0].data;
+      currentSeries.push(candle);
+      if (currentSeries.length > 50) currentSeries.shift();
+      chart.updateSeries([{ data: currentSeries }]);
+    }
+
     function update() {
-      const market = getSymbolFromValue(marketSelect.value);
+      const symbol = marketSelect.value;
       const granularity = granularitySelect.value;
-      connectToDeriv(market, granularity);
+      createWebSocket(symbol, granularity);
     }
 
     marketSelect.addEventListener('change', update);
