@@ -1,5 +1,6 @@
 const chartEl = document.querySelector('#chart');
 const signalEl = document.getElementById('signal');
+const timeEl = document.getElementById('spike-time');
 const siren = document.getElementById('siren');
 let chart;
 let ws;
@@ -9,13 +10,15 @@ function connect() {
   const granularity = 3600; // 1 hour
   const appId = 1089;
 
-  ws = new WebSocket(`wss://ws.binaryws.com/websockets/v3?app_id=${appId}`);
+  ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${appId}`);
 
   ws.onopen = () => {
     ws.send(JSON.stringify({
-      candles: symbol,
-      granularity,
+      ticks_history: symbol,
+      style: 'candles',
+      adjust_start_time: 1,
       count: 50,
+      granularity,
       subscribe: 1
     }));
   };
@@ -35,7 +38,7 @@ function connect() {
   };
 
   ws.onerror = (e) => console.error('WebSocket error:', e);
-  ws.onclose = () => console.log('WebSocket closed.');
+  ws.onclose = () => console.warn('WebSocket closed. Retrying in 3s...') || setTimeout(connect, 3000);
 }
 
 function updateChart(data) {
@@ -52,8 +55,8 @@ function updateChart(data) {
       plotOptions: {
         candlestick: {
           colors: {
-            upward: '#00f',   // Blue for bullish
-            downward: '#f00'  // Red for bearish
+            upward: '#00f',
+            downward: '#f00'
           }
         }
       }
@@ -69,12 +72,16 @@ function detectSpike(data) {
   const last = data[data.length - 1];
   const prev = data[data.length - 2];
 
-  const isSpike = last.y[1] - last.y[0] > (prev.y[1] - prev.y[0]) * 1.5;
-  if (isSpike) {
+  const spike = last.y[1] - last.y[0];
+  const prevRange = prev.y[1] - prev.y[0];
+
+  if (spike > prevRange * 1.5) {
     signalEl.textContent = '🚨 Spike detected!';
+    timeEl.textContent = `Spike Time: ${last.x.toLocaleString()}`;
     siren.play();
   } else {
     signalEl.textContent = 'Monitoring for spikes...';
+    timeEl.textContent = '';
   }
 }
 
