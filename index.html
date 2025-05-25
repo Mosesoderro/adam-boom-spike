@@ -74,13 +74,15 @@
       const granularity = 3600; // 1 hour
       const appId = 1089;
 
-      ws = new WebSocket(`wss://ws.binaryws.com/websockets/v3?app_id=${appId}`);
+      ws = new WebSocket(`wss://ws.derivws.com/websockets/v3?app_id=${appId}`);
 
       ws.onopen = () => {
         ws.send(JSON.stringify({
-          candles: symbol,
-          granularity,
+          ticks_history: symbol,
+          style: 'candles',
+          adjust_start_time: 1,
           count: 50,
+          granularity,
           subscribe: 1
         }));
       };
@@ -100,7 +102,7 @@
       };
 
       ws.onerror = (e) => console.error('WebSocket error:', e);
-      ws.onclose = () => console.log('WebSocket closed.');
+      ws.onclose = () => console.warn('WebSocket closed. Retrying in 3s...') || setTimeout(connect, 3000);
     }
 
     function updateChart(data) {
@@ -134,8 +136,10 @@
       const last = data[data.length - 1];
       const prev = data[data.length - 2];
 
-      const isSpike = last.y[1] - last.y[0] > (prev.y[1] - prev.y[0]) * 1.5;
-      if (isSpike) {
+      const spike = last.y[1] - last.y[0];
+      const prevRange = prev.y[1] - prev.y[0];
+
+      if (spike > prevRange * 1.5) {
         signalEl.textContent = '🚨 Spike detected!';
         timeEl.textContent = `Spike Time: ${last.x.toLocaleString()}`;
         siren.play();
