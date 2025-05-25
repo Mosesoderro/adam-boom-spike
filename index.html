@@ -76,7 +76,6 @@
     let ws;
 
     function getSymbolFromValue(value) {
-      // Deriv uses different symbol names. Adjust as needed.
       if (value === 'R_50') return 'boom_500_index';
       if (value === 'R_100') return 'boom_1000_index';
       return 'boom_500_index';
@@ -89,8 +88,7 @@
 
       ws.onopen = () => {
         ws.send(JSON.stringify({
-          ticks_history: symbol,
-          style: 'candles',
+          candles: symbol,
           granularity: parseInt(granularity),
           count: 50,
           subscribe: 1
@@ -135,8 +133,8 @@
           plotOptions: {
             candlestick: {
               colors: {
-                upward: '#00f', // blue
-                downward: '#f00' // red
+                upward: '#00f',
+                downward: '#f00'
               }
             }
           }
