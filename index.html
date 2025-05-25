@@ -1,122 +1,188 @@
-<script>
-  const chartEl = document.querySelector('#chart');
-  const signalEl = document.getElementById('signal');
-  const timeEl = document.getElementById('spike-time');
-  const countdownEl = document.getElementById('countdown');
-  const siren = document.getElementById('siren');
-  let chart;
-  let ws;
-  let countdownTimer;
-  let lastSpikeTime = null;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ADAM BOOM SPIKE</title>
+  <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #111;
+      color: #0f0;
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+    header, footer {
+      padding: 1em;
+      background: #222;
+    }
+    main {
+      padding: 1em;
+    }
+    #chart-container {
+      max-width: 100%;
+      margin: auto;
+    }
+    #signal {
+      margin-top: 20px;
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+    #spike-time {
+      margin-top: 10px;
+      font-size: 1em;
+      color: #ff0;
+    }
+    #countdown {
+      font-size: 1.2em;
+      color: #f80;
+      margin-top: 10px;
+    }
+    audio {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
+      <p>Market: Boom 1000 | Timeframe: 1 Hour</p>
+    </header>
 
-  function connect() {
-    const symbol = 'R_1000'; // Boom 1000
-    const granularity = 3600; // 1 hour
+    <main>
+      <div id="chart-container">
+        <div id="chart" style="height: 500px;"></div>
+      </div>
+      <div id="signal">Monitoring for spikes...</div>
+      <div id="spike-time"></div>
+      <div id="countdown"></div>
+      <audio id="siren" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
+    </main>
 
-    ws = new WebSocket('wss://ws.deriv.com/websockets/v3');
+    <footer>
+      <p>© 2025 Sheriff Adam 💰</p>
+    </footer>
+  </div>
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        ticks_history: symbol,
-        style: 'candles',
-        adjust_start_time: 1,
-        count: 100,
-        granularity,
-        subscribe: 1
-      }));
-    };
+  <script>
+    const chartEl = document.querySelector('#chart');
+    const signalEl = document.getElementById('signal');
+    const timeEl = document.getElementById('spike-time');
+    const countdownEl = document.getElementById('countdown');
+    const siren = document.getElementById('siren');
+    let chart;
+    let ws;
+    let countdownTimer;
+    let lastSpikeTime = null;
 
-    ws.onmessage = (msg) => {
-      const data = JSON.parse(msg.data);
-      const candles = data.candles || data.history?.candles || [];
+    function connect() {
+      const symbol = 'R_1000'; // Boom 1000
+      const granularity = 3600; // 1 hour
 
-      if (candles.length) {
-        const seriesData = candles.map(c => ({
-          x: new Date(c.epoch * 1000),
-          y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
+      ws = new WebSocket('wss://ws.deriv.com/websockets/v3');
+
+      ws.onopen = () => {
+        ws.send(JSON.stringify({
+          ticks_history: symbol,
+          style: 'candles',
+          adjust_start_time: 1,
+          count: 100,
+          granularity,
+          subscribe: 1
         }));
-        updateChart(seriesData);
-        detectSpike(seriesData);
-      }
-    };
+      };
 
-    ws.onerror = (e) => console.error('WebSocket error:', e);
-    ws.onclose = () => {
-      console.warn('WebSocket closed. Retrying in 3s...');
-      setTimeout(connect, 3000);
-    };
-  }
+      ws.onmessage = (msg) => {
+        const data = JSON.parse(msg.data);
+        const candles = data.candles || data.history?.candles || [];
 
-  function updateChart(data) {
-    if (!chart) {
-      chart = new ApexCharts(chartEl, {
-        chart: {
-          type: 'candlestick',
-          height: 500,
-          background: '#111',
-          foreColor: '#0f0'
-        },
-        series: [{ data }],
-        xaxis: { type: 'datetime' },
-        plotOptions: {
-          candlestick: {
-            colors: {
-              upward: '#00f',   // Bullish: blue
-              downward: '#f00'  // Bearish: red
+        if (candles.length) {
+          const seriesData = candles.map(c => ({
+            x: new Date(c.epoch * 1000),
+            y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
+          }));
+          updateChart(seriesData);
+          detectSpike(seriesData);
+        }
+      };
+
+      ws.onerror = (e) => console.error('WebSocket error:', e);
+      ws.onclose = () => {
+        console.warn('WebSocket closed. Retrying in 3s...');
+        setTimeout(connect, 3000);
+      };
+    }
+
+    function updateChart(data) {
+      if (!chart) {
+        chart = new ApexCharts(chartEl, {
+          chart: {
+            type: 'candlestick',
+            height: 500,
+            background: '#111',
+            foreColor: '#0f0'
+          },
+          series: [{ data }],
+          xaxis: { type: 'datetime' },
+          plotOptions: {
+            candlestick: {
+              colors: {
+                upward: '#00f',
+                downward: '#f00'
+              }
             }
           }
-        }
-      });
-      chart.render();
-    } else {
-      chart.updateSeries([{ data }]);
-    }
-  }
-
-  function detectSpike(data) {
-    if (data.length < 4) return;
-
-    const last = data[data.length - 1];
-    const prev = data[data.length - 2];
-    const prev2 = data[data.length - 3];
-
-    const bodySize = Math.abs(last.y[3] - last.y[0]);
-    const wickSize = last.y[1] - last.y[2];
-    const isSpike = wickSize > bodySize * 3 && last.y[3] < last.y[0]; // large wick and bearish
-
-    if (isSpike && lastSpikeTime !== last.x.getTime()) {
-      lastSpikeTime = last.x.getTime();
-      startCountdown(30, () => {
-        signalEl.textContent = '🚨 Spike Detected!';
-        timeEl.textContent = `Spike Time: ${last.x.toLocaleString()}`;
-        try {
-          siren.play();
-        } catch (err) {
-          console.warn("Audio playback failed (may need user interaction)");
-        }
-      });
-    } else {
-      signalEl.textContent = 'Monitoring for spikes...';
-      timeEl.textContent = '';
-      countdownEl.textContent = '';
-      clearInterval(countdownTimer);
-    }
-  }
-
-  function startCountdown(seconds, onComplete) {
-    clearInterval(countdownTimer);
-    let timeLeft = seconds;
-    countdownEl.textContent = `Spike in ${timeLeft} seconds...`;
-    countdownTimer = setInterval(() => {
-      timeLeft--;
-      countdownEl.textContent = `Spike in ${timeLeft} seconds...`;
-      if (timeLeft <= 0) {
-        clearInterval(countdownTimer);
-        countdownEl.textContent = '';
-        onComplete();
+        });
+        chart.render();
+      } else {
+        chart.updateSeries([{ data }]);
       }
-    }, 1000);
-  }
+    }
 
-  connect();
-</script>
+    function detectSpike(data) {
+      if (data.length < 4) return;
+
+      const last = data[data.length - 1];
+      const prev = data[data.length - 2];
+      const prev2 = data[data.length - 3];
+
+      const bodySize = Math.abs(last.y[3] - last.y[0]);
+      const wickSize = last.y[1] - last.y[2];
+      const isSpike = wickSize > bodySize * 3 && last.y[3] < last.y[0];
+
+      if (isSpike && lastSpikeTime !== last.x.getTime()) {
+        lastSpikeTime = last.x.getTime();
+        startCountdown(30, () => {
+          signalEl.textContent = '🚨 Spike Detected!';
+          timeEl.textContent = `Spike Time: ${last.x.toLocaleString()}`;
+          try { siren.play(); } catch (err) { console.warn("Audio failed to play"); }
+        });
+      } else {
+        signalEl.textContent = 'Monitoring for spikes...';
+        timeEl.textContent = '';
+        countdownEl.textContent = '';
+        clearInterval(countdownTimer);
+      }
+    }
+
+    function startCountdown(seconds, onComplete) {
+      clearInterval(countdownTimer);
+      let timeLeft = seconds;
+      countdownEl.textContent = `Spike in ${timeLeft} seconds...`;
+      countdownTimer = setInterval(() => {
+        timeLeft--;
+        countdownEl.textContent = `Spike in ${timeLeft} seconds...`;
+        if (timeLeft <= 0) {
+          clearInterval(countdownTimer);
+          countdownEl.textContent = '';
+          onComplete();
+        }
+      }, 1000);
+    }
+
+    connect();
+  </script>
+</body>
+</html>
