@@ -1,55 +1,93 @@
-// app.js
-document.addEventListener("DOMContentLoaded", () => {
-  const loginBtn = document.getElementById("loginBtn");
-  loginBtn.addEventListener("click", login);
-});
+const marketSelect = document.getElementById('market');
+const granularitySelect = document.getElementById('granularity');
+let chart;
+let ws;
 
-function login() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
-  const errorMsg = document.getElementById("login-error");
+function getSymbolFromValue(value) {
+  if (value === 'R_50') return 'boom_500_index';
+  if (value === 'R_100') return 'boom_1000_index';
+  return 'boom_500_index';
+}
 
-  if (username === "admin" && password === "admin123") {
-    document.getElementById("login").style.display = "none";
-    document.getElementById("app").style.display = "block";
-    initChart(); // initialize chart after login
+function connectToDeriv(symbol, granularity) {
+  if (ws) ws.close();
+
+  ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
+
+  ws.onopen = () => {
+    const candleRequest = {
+      candles: symbol,
+      granularity: parseInt(granularity),
+      count: 100,
+      subscribe: 1
+    };
+    ws.send(JSON.stringify(candleRequest));
+  };
+
+  ws.onmessage = (event) => {
+    const response = JSON.parse(event.data);
+    const candles = response.candles || response.history?.candles || [];
+
+    if (candles.length) {
+      const seriesData = candles.map(c => ({
+        x: new Date(c.epoch * 1000),
+        y: [
+          parseFloat(c.open),
+          parseFloat(c.high),
+          parseFloat(c.low),
+          parseFloat(c.close)
+        ]
+      }));
+      updateChart(seriesData);
+    }
+  };
+
+  ws.onerror = (err) => {
+    console.error("WebSocket Error:", err);
+    document.getElementById("signal").textContent = "⚠️ Connection Error";
+  };
+
+  ws.onclose = () => {
+    console.warn("WebSocket Closed");
+    document.getElementById("signal").textContent = "🔌 Disconnected";
+  };
+}
+
+function updateChart(data) {
+  if (!chart) {
+    chart = new ApexCharts(document.querySelector('#chart'), {
+      chart: {
+        type: 'candlestick',
+        height: 500,
+        background: '#111',
+        foreColor: '#0f0'
+      },
+      series: [{ data }],
+      xaxis: {
+        type: 'datetime'
+      },
+      plotOptions: {
+        candlestick: {
+          colors: {
+            upward: '#00f',   // Blue for bullish
+            downward: '#f00'  // Red for bearish
+          }
+        }
+      }
+    });
+    chart.render();
   } else {
-    errorMsg.textContent = "Invalid credentials. Try again.";
+    chart.updateSeries([{ data }]);
   }
 }
 
-function initChart() {
-  const chartDiv = document.getElementById("chart");
-
-  const chart = LightweightCharts.createChart(chartDiv, {
-    width: chartDiv.clientWidth,
-    height: 500,
-    layout: {
-      background: { color: '#111' },
-      textColor: '#0f0',
-    },
-    grid: {
-      vertLines: { color: '#222' },
-      horzLines: { color: '#222' },
-    },
-    crosshair: {
-      mode: LightweightCharts.CrosshairMode.Normal,
-    },
-    timeScale: {
-      borderColor: '#71649C',
-    },
-  });
-
-  const lineSeries = chart.addLineSeries();
-
-  const now = Math.floor(Date.now() / 1000);
-  const dummyData = [
-    { time: now - 240, value: 10100 },
-    { time: now - 180, value: 10110 },
-    { time: now - 120, value: 10090 },
-    { time: now - 60, value: 10130 },
-    { time: now, value: 10120 },
-  ];
-
-  lineSeries.setData(dummyData);
+function update() {
+  const market = getSymbolFromValue(marketSelect.value);
+  const granularity = granularitySelect.value;
+  connectToDeriv(market, granularity);
 }
+
+marketSelect.addEventListener('change', update);
+granularitySelect.addEventListener('change', update);
+
+update(); // initial load
