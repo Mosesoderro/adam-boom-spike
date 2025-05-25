@@ -43,8 +43,8 @@
       <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
       <label for="market">Market:</label>
       <select id="market">
-        <option value="boom_500_index">Boom 500</option>
-        <option value="boom_1000_index">Boom 1000</option>
+        <option value="R_50">Boom 500</option>
+        <option value="R_100">Boom 1000</option>
       </select>
 
       <label for="granularity">Timeframe:</label>
@@ -75,6 +75,13 @@
     let chart;
     let ws;
 
+    function getSymbolFromValue(value) {
+      // Deriv uses different symbol names. Adjust as needed.
+      if (value === 'R_50') return 'boom_500_index';
+      if (value === 'R_100') return 'boom_1000_index';
+      return 'boom_500_index';
+    }
+
     async function connectToDeriv(symbol, granularity) {
       if (ws) ws.close();
 
@@ -92,8 +99,9 @@
 
       ws.onmessage = (msg) => {
         const data = JSON.parse(msg.data);
-        if (data.history || data.candles) {
-          const candles = data.history?.candles || data.candles;
+        const candles = data.candles || data.history?.candles || [];
+
+        if (candles.length) {
           const seriesData = candles.map(c => ({
             x: new Date(c.epoch * 1000),
             y: [
@@ -127,8 +135,8 @@
           plotOptions: {
             candlestick: {
               colors: {
-                upward: '#00f', // blue for bullish
-                downward: '#f00' // red for bearish
+                upward: '#00f', // blue
+                downward: '#f00' // red
               }
             }
           }
@@ -140,7 +148,7 @@
     }
 
     function update() {
-      const market = marketSelect.value;
+      const market = getSymbolFromValue(marketSelect.value);
       const granularity = granularitySelect.value;
       connectToDeriv(market, granularity);
     }
