@@ -1,0 +1,29 @@
+
+body {
+  background: #000;
+  color: #0f0;
+  font-family: monospace;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
+header {
+  padding: 1em;
+  font-size: 1.5em;
+}
+#chart {
+  width: 100%;
+  height: 500px;
+  max-width: 1000px;
+  margin: auto;
+}
+#signal {
+  font-size: 1.3em;
+  margin: 1em;
+  color: yellow;
+}
+footer {
+  margin-top: 2em;
+  font-size: 0.9em;
+  padding-bottom: 1em;
+}
