@@ -1,24 +1,63 @@
-
+<!-- index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>ADAM BOOM SPIKE</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://unpkg.com/lightweight-charts@3.0.0/dist/lightweight-charts.standalone.production.js"></script>
 </head>
 <body>
-  <header>
-    <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
-    <p>The New Sheriff in Town</p>
-  </header>
-  <main>
-    <div id="chart"></div>
-    <div id="signal">Monitoring for spikes...</div>
-  </main>
-  <footer>
-    <p>© 2025 Sheriff Adam 💰</p>
-  </footer>
+  <div id="login">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username"><br>
+    <input type="password" id="password" placeholder="Password"><br>
+    <button id="loginBtn">Login</button>
+    <p id="login-error"></p>
+  </div>
+
+  <div id="app" style="display: none;">
+    <header>
+      <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
+      <label for="market">Market:</label>
+      <select id="market">
+        <option value="boom_500_index">Boom 500</option>
+        <option value="boom_1000_index">Boom 1000</option>
+      </select>
+
+      <label for="granularity">Timeframe:</label>
+      <select id="granularity">
+        <option value="60">1 min</option>
+        <option value="300">5 min</option>
+        <option value="900">15 min</option>
+        <option value="3600">1 hour</option>
+      </select>
+    </header>
+
+    <main>
+      <div id="chart" style="height: 500px;"></div>
+      <div id="signal">Monitoring for spikes...</div>
+    </main>
+    <footer>
+      <p>© 2025 Sheriff Adam 💰</p>
+    </footer>
+  </div>
+
+  <script>
+    document.getElementById("loginBtn").addEventListener("click", function login() {
+      const username = document.getElementById("username").value;
+      const password = document.getElementById("password").value;
+      const errorMsg = document.getElementById("login-error");
+
+      if (username === "admin" && password === "admin123") {
+        document.getElementById("login").style.display = "none";
+        document.getElementById("app").style.display = "block";
+      } else {
+        errorMsg.textContent = "Invalid credentials. Try again.";
+      }
+    });
+  </script>
+
   <script src="app.js" defer></script>
 </body>
 </html>
