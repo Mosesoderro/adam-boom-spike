@@ -1,25 +1,18 @@
-body {
-  background: #000;
-  color: #0f0;
-  font-family: monospace;
-  text-align: center;
-  padding: 1em;
-}
-header {
-  font-size: 1.5em;
-  margin-bottom: 1em;
-}
-#chart-container {
-  border: 2px solid #0f0;
-  margin: 1em auto;
-  width: 95%;
-}
-#signal {
-  font-size: 1.3em;
-  margin-top: 1em;
-  color: yellow;
-}
-footer {
-  margin-top: 2em;
-  font-size: 0.9em;
-}
+document.addEventListener('DOMContentLoaded', () => {
+  const signal = document.getElementById('signal');
+
+  function checkSpike() {
+    const spikeLikely = Math.random() < 0.15;  // 15% chance every 10s
+    if (spikeLikely) {
+      signal.textContent = "🚨 Spike likely in 10 seconds!";
+      signal.style.color = 'red';
+      const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+      audio.play();
+    } else {
+      signal.textContent = "Monitoring for spikes...";
+      signal.style.color = 'yellow';
+    }
+  }
+
+  setInterval(checkSpike, 10000);
+});
