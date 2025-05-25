@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>ADAM BOOM SPIKE</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.css" />
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <style>
     body {
@@ -12,7 +11,6 @@
       background: #111;
       color: #0f0;
       margin: 0;
-      padding: 0;
       text-align: center;
     }
     header, footer {
@@ -44,10 +42,9 @@
       <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
       <label for="market">Market:</label>
       <select id="market">
-        <option value="boom500">Boom 500</option>
-        <option value="boom1000">Boom 1000</option>
+        <option value="BOOM500">Boom 500</option>
+        <option value="BOOM1000">Boom 1000</option>
       </select>
-
       <label for="granularity">Timeframe:</label>
       <select id="granularity">
         <option value="60">1 min</option>
@@ -71,28 +68,20 @@
   </div>
 
   <script>
-    const marketSelect = document.getElementById('market');
-    const granularitySelect = document.getElementById('granularity');
+    const marketSelect = document.getElementById("market");
+    const granularitySelect = document.getElementById("granularity");
     let chart;
     let ws;
 
-    function getSymbol(market) {
-      return market === 'boom500' ? 'R_50' : 'R_100';
-    }
-
-    function connectToDeriv(market, timeframe) {
-      const symbol = market;
-      const granularity = parseInt(timeframe);
-      const derivSymbol = symbol.toUpperCase();
-
+    function connectToDeriv(symbol, granularity) {
       if (ws) ws.close();
 
       ws = new WebSocket("wss://ws.deriv.com/websockets/v3");
       ws.onopen = () => {
         ws.send(JSON.stringify({
-          ticks_history: derivSymbol,
+          ticks_history: symbol,
           style: "candles",
-          granularity: granularity,
+          granularity: parseInt(granularity),
           count: 100,
           subscribe: 1
         }));
@@ -101,12 +90,20 @@
       ws.onmessage = (msg) => {
         const data = JSON.parse(msg.data);
         if (data.candles) {
-          const seriesData = data.candles.map(c => ({
+          const candles = data.candles.map(c => ({
             x: new Date(c.epoch * 1000),
             y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
           }));
-          updateChart(seriesData);
+          updateChart(candles);
         }
+      };
+
+      ws.onerror = (e) => {
+        console.error("WebSocket error:", e);
+      };
+      ws.onclose = () => {
+        console.log("WebSocket closed. Reconnecting...");
+        setTimeout(() => connectToDeriv(symbol, granularity), 3000);
       };
     }
 
@@ -126,8 +123,8 @@
           plotOptions: {
             candlestick: {
               colors: {
-                upward: '#00f',
-                downward: '#f00'
+                upward: '#00f',   // blue for bullish
+                downward: '#f00'  // red for bearish
               }
             }
           }
@@ -144,10 +141,10 @@
       connectToDeriv(market, granularity);
     }
 
-    marketSelect.addEventListener('change', update);
-    granularitySelect.addEventListener('change', update);
+    marketSelect.addEventListener("change", update);
+    granularitySelect.addEventListener("change", update);
 
-    update();
+    update(); // Initial call
   </script>
 </body>
 </html>
