@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>ADAM BOOM SPIKE</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@3.44.0/dist/apexcharts.min.css">
   <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
   <style>
     body {
@@ -11,6 +11,7 @@
       background: #111;
       color: #0f0;
       margin: 0;
+      padding: 0;
       text-align: center;
     }
     header, footer {
@@ -19,11 +20,6 @@
     }
     main {
       padding: 1em;
-    }
-    select {
-      padding: 6px;
-      font-size: 1em;
-      margin: 0 5px;
     }
     #chart-container {
       max-width: 100%;
@@ -34,92 +30,75 @@
       font-weight: bold;
       font-size: 1.2em;
     }
+    audio {
+      display: none;
+    }
   </style>
 </head>
 <body>
   <div id="app">
     <header>
       <h1>🚨 ADAM BOOM SPIKE 🚨</h1>
-      <label for="market">Market:</label>
-      <select id="market">
-        <option value="boom_500_index">Boom 500</option>
-        <option value="boom_1000_index">Boom 1000</option>
-      </select>
-
-      <label for="granularity">Timeframe:</label>
-      <select id="granularity">
-        <option value="60">1 min</option>
-        <option value="300">5 min</option>
-        <option value="900">15 min</option>
-        <option value="3600">1 hour</option>
-        <option value="14400">4 hour</option>
-        <option value="86400">1 Day</option>
-      </select>
+      <p>Market: Boom 1000 | Timeframe: 1 Hour</p>
     </header>
 
     <main>
       <div id="chart-container">
         <div id="chart" style="height: 500px;"></div>
       </div>
-      <div id="signal">📡 Connected. Loading candles...</div>
+      <div id="signal">Monitoring for spikes...</div>
+      <audio id="siren" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
     </main>
+
     <footer>
       <p>© 2025 Sheriff Adam 💰</p>
     </footer>
   </div>
 
   <script>
+    const chartEl = document.querySelector('#chart');
+    const signalEl = document.getElementById('signal');
+    const siren = document.getElementById('siren');
     let chart;
     let ws;
 
-    const marketSelect = document.getElementById('market');
-    const granularitySelect = document.getElementById('granularity');
+    function connect() {
+      const symbol = 'boom_1000_index';
+      const granularity = 3600; // 1 hour
+      const appId = 1089;
 
-    function createWebSocket(symbol, granularity) {
-      if (ws) ws.close();
-
-      ws = new WebSocket('wss://ws.binaryws.com/websockets/v3?app_id=1089');
+      ws = new WebSocket(`wss://ws.binaryws.com/websockets/v3?app_id=${appId}`);
 
       ws.onopen = () => {
-        const req = {
+        ws.send(JSON.stringify({
           candles: symbol,
-          granularity: parseInt(granularity),
+          granularity,
           count: 50,
           subscribe: 1
-        };
-        ws.send(JSON.stringify(req));
-        document.getElementById('signal').textContent = '📡 Connected. Loading candles...';
+        }));
       };
 
       ws.onmessage = (msg) => {
         const data = JSON.parse(msg.data);
+        const candles = data.candles || data.history?.candles || [];
 
-        if (data.msg_type === 'candles') {
-          const candles = data.candles.map(c => ({
+        if (candles.length) {
+          const seriesData = candles.map(c => ({
             x: new Date(c.epoch * 1000),
             y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
           }));
-          updateChart(candles);
-        }
-        if (data.msg_type === 'ohlc') {
-          const c = data.ohlc;
-          const newCandle = {
-            x: new Date(c.epoch * 1000),
-            y: [parseFloat(c.open), parseFloat(c.high), parseFloat(c.low), parseFloat(c.close)]
-          };
-          updateChartPoint(newCandle);
+          updateChart(seriesData);
+          detectSpike(seriesData);
         }
       };
 
-      ws.onerror = (e) => {
-        console.error('WebSocket error:', e);
-        document.getElementById('signal').textContent = '❌ WebSocket Error';
-      };
+      ws.onerror = (e) => console.error('WebSocket error:', e);
+      ws.onclose = () => console.log('WebSocket closed.');
     }
 
     function updateChart(data) {
       if (!chart) {
-        chart = new ApexCharts(document.querySelector('#chart'), {
+        chart = new ApexCharts(chartEl, {
           chart: {
             type: 'candlestick',
             height: 500,
@@ -127,9 +106,7 @@
             foreColor: '#0f0'
           },
           series: [{ data }],
-          xaxis: {
-            type: 'datetime'
-          },
+          xaxis: { type: 'datetime' },
           plotOptions: {
             candlestick: {
               colors: {
@@ -145,23 +122,21 @@
       }
     }
 
-    function updateChartPoint(candle) {
-      const currentSeries = chart.w.globals.initialSeries[0].data;
-      currentSeries.push(candle);
-      if (currentSeries.length > 50) currentSeries.shift();
-      chart.updateSeries([{ data: currentSeries }]);
+    function detectSpike(data) {
+      if (data.length < 2) return;
+      const last = data[data.length - 1];
+      const prev = data[data.length - 2];
+
+      const isSpike = last.y[1] - last.y[0] > (prev.y[1] - prev.y[0]) * 1.5;
+      if (isSpike) {
+        signalEl.textContent = '🚨 Spike detected!';
+        siren.play();
+      } else {
+        signalEl.textContent = 'Monitoring for spikes...';
+      }
     }
 
-    function update() {
-      const symbol = marketSelect.value;
-      const granularity = granularitySelect.value;
-      createWebSocket(symbol, granularity);
-    }
-
-    marketSelect.addEventListener('change', update);
-    granularitySelect.addEventListener('change', update);
-
-    update();
+    connect();
   </script>
 </body>
 </html>
