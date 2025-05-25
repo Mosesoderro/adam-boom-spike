@@ -35,6 +35,11 @@
       font-size: 1em;
       color: #ff0;
     }
+    #countdown {
+      font-size: 1.2em;
+      color: #f80;
+      margin-top: 10px;
+    }
     audio {
       display: none;
     }
@@ -53,6 +58,7 @@
       </div>
       <div id="signal">Monitoring for spikes...</div>
       <div id="spike-time"></div>
+      <div id="countdown"></div>
       <audio id="siren" src="https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg"></audio>
     </main>
 
@@ -65,9 +71,11 @@
     const chartEl = document.querySelector('#chart');
     const signalEl = document.getElementById('signal');
     const timeEl = document.getElementById('spike-time');
+    const countdownEl = document.getElementById('countdown');
     const siren = document.getElementById('siren');
     let chart;
     let ws;
+    let countdownTimer;
 
     function connect() {
       const symbol = 'boom_1000_index';
@@ -140,13 +148,33 @@
       const prevRange = prev.y[1] - prev.y[0];
 
       if (spike > prevRange * 1.5) {
-        signalEl.textContent = '🚨 Spike detected!';
-        timeEl.textContent = `Spike Time: ${last.x.toLocaleString()}`;
-        siren.play();
+        startCountdown(30, () => {
+          signalEl.textContent = '🚨 Spike detected!';
+          timeEl.textContent = `Spike Time: ${last.x.toLocaleString()}`;
+          siren.play();
+        });
       } else {
         signalEl.textContent = 'Monitoring for spikes...';
         timeEl.textContent = '';
+        countdownEl.textContent = '';
+        clearInterval(countdownTimer);
       }
+    }
+
+    function startCountdown(seconds, onComplete) {
+      clearInterval(countdownTimer);
+      let timeLeft = seconds;
+      countdownEl.textContent = `Spike in ${timeLeft} seconds...`;
+      countdownTimer = setInterval(() => {
+        timeLeft--;
+        if (timeLeft > 0) {
+          countdownEl.textContent = `Spike in ${timeLeft} seconds...`;
+        } else {
+          clearInterval(countdownTimer);
+          countdownEl.textContent = '';
+          onComplete();
+        }
+      }, 1000);
     }
 
     connect();
